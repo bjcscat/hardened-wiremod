@@ -14,6 +14,15 @@ local E2tempSpawnedProps = 0
 local TimeStamp = 0
 local playerMeta = FindMetaTable("Player")
 
+local clamp = math.Clamp
+local function clampVecToMDiff(vec)
+	local mdiff = sbox_E2_PropDiff:GetInt()
+	vec[1]=clamp(vec[1],-mdiff,mdiff)
+	vec[2]=clamp(vec[2],-mdiff,mdiff)
+	vec[3]=clamp(vec[3],-mdiff,mdiff)
+	return vec
+end
+
 local function TempReset()
  if (CurTime()>= TimeStamp) then
 	E2tempSpawnedProps = 0
@@ -71,15 +80,23 @@ function PropCore.CanManipulateProp(self,prop)
 	return false
 end
 
+function PropCore.CanSendToPlace(self,prop,place)
+	local tracedLine = util.QuickTrace(prop:GetPos(),place-prop:GetPos(),function(ent)
+		return ent:GetOwner()==self.player
+	end)
+	return tracedLine == nil
+end
+
 function PropCore.PhysManipulate(self, this, pos, rot, freeze, gravity, notsolid)
+	if this:IsPlayer() then return end
 	local phys = this:GetPhysicsObject()
 	local physOrThis = IsValid(phys) and phys or this
 	if not PropCore.CanManipulateProp(self,physOrThis) then return end
 	if pos ~= nil then 
 		local currentPos = self.entity:GetPos() -- get current chip pos
-		local distMagnitude = math.abs(pos[1]-currentPos[1]+pos[2]-currentPos[2]+pos[3]-currentPos[3]) -- get distance
-		if distMagnitude <= sbox_E2_PropDiff:GetInt() then -- check distance
-			WireLib.setPos( physOrThis, Vector( pos[1],pos[2],pos[3] ) )
+		local clampedOffset = clampVecToMDiff(Vector(pos[1]-currentPos[1]+pos[2]-currentPos[2]+pos[3]-currentPos[3])) -- get offset
+		if PropCore.CanSendToPlace(self,physOrThis,pos+clampedOffset) then
+			WireLib.setPos( physOrThis, pos+clampedOffset )
 		end 
 	end
 	if rot ~= nil then 
